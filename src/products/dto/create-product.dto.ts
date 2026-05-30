@@ -37,4 +37,5 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   badge?: string;
+
 }

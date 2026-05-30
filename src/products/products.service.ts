@@ -6,29 +6,27 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schemas/product.schema';
-import { Category, CategoryDocument } from './schemas/category.schema';
 import {
   InventoryAdjustment,
   InventoryAdjustmentDocument,
 } from './schemas/inventory-adjustment.schema';
 import { FlashSale, FlashSaleDocument } from './schemas/flash-sale.schema';
+import { CategoriesService } from '../categories/categories.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateVariantDto } from './dto/create-variant.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
-import { CreateCategoryDto } from './dto/create-category.dto';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name)
     private readonly productModel: Model<ProductDocument>,
-    @InjectModel(Category.name)
-    private readonly categoryModel: Model<CategoryDocument>,
     @InjectModel(InventoryAdjustment.name)
     private readonly inventoryAdjustmentModel: Model<InventoryAdjustmentDocument>,
     @InjectModel(FlashSale.name)
     private readonly flashSaleModel: Model<FlashSaleDocument>,
+    private readonly categoriesService: CategoriesService,
   ) {}
 
   /**
@@ -47,15 +45,8 @@ export class ProductsService {
    * Create a new product. Validates that the categoryId exists before creating.
    */
   async create(createProductDto: CreateProductDto): Promise<ProductDocument> {
-    const category = await this.categoryModel
-      .findById(createProductDto.categoryId)
-      .exec();
-
-    if (!category) {
-      throw new BadRequestException(
-        `Category with id "${createProductDto.categoryId}" not found`,
-      );
-    }
+    // Validate category exists
+    await this.categoriesService.findById(createProductDto.categoryId);
 
     const searchText = this.generateSearchText(
       createProductDto.name,
@@ -87,15 +78,8 @@ export class ProductsService {
     }
 
     if (updateProductDto.categoryId) {
-      const category = await this.categoryModel
-        .findById(updateProductDto.categoryId)
-        .exec();
-
-      if (!category) {
-        throw new BadRequestException(
-          `Category with id "${updateProductDto.categoryId}" not found`,
-        );
-      }
+      // Validate category exists
+      await this.categoriesService.findById(updateProductDto.categoryId);
     }
 
     // Apply updates
@@ -154,18 +138,23 @@ export class ProductsService {
   }
 
   /**
-   * Find all products with pagination and optional category filter.
+   * Find all products with pagination and optional category/search filter.
    * Excludes soft-deleted products. Includes flash sale pricing info when applicable.
    */
   async findAll(
     page: number = 1,
     limit: number = 10,
     categoryId?: string,
-  ): Promise<{ products: (ProductDocument & { flashSalePrice?: number; flashSaleEndTime?: Date })[]; total: number }> {
+    search?: string,
+  ): Promise<{ products: (ProductDocument & { flashSalePrice?: number; flashSaleEndTime?: Date })[]; total: number; page: number; limit: number; totalPages: number }> {
     const filter: Record<string, unknown> = { isDeleted: { $ne: true } };
 
     if (categoryId) {
       filter.categoryId = new Types.ObjectId(categoryId);
+    }
+
+    if (search) {
+      filter.$text = { $search: search };
     }
 
     const skip = (page - 1) * limit;
@@ -200,7 +189,7 @@ export class ProductsService {
       return productObj as any;
     });
 
-    return { products: enrichedProducts, total };
+    return { products: enrichedProducts, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   /**
@@ -270,46 +259,6 @@ export class ProductsService {
 
     product.images.push(...imageUrls);
     return product.save();
-  }
-
-  /**
-   * Create a new category.
-   * If parentId is provided, validates that the parent category exists.
-   */
-  async createCategory(
-    createCategoryDto: CreateCategoryDto,
-  ): Promise<CategoryDocument> {
-    if (createCategoryDto.parentId) {
-      const parent = await this.categoryModel
-        .findById(createCategoryDto.parentId)
-        .exec();
-
-      if (!parent) {
-        throw new BadRequestException(
-          `Parent category with id "${createCategoryDto.parentId}" not found`,
-        );
-      }
-    }
-
-    const category = new this.categoryModel({
-      ...createCategoryDto,
-      ...(createCategoryDto.parentId && {
-        parentId: new Types.ObjectId(createCategoryDto.parentId),
-      }),
-    });
-
-    return category.save();
-  }
-
-  /**
-   * List all active categories sorted by sortOrder.
-   * Supports hierarchy via parentId references.
-   */
-  async listCategories(): Promise<CategoryDocument[]> {
-    return this.categoryModel
-      .find({ isActive: true })
-      .sort({ sortOrder: 1 })
-      .exec();
   }
 
   // ─── Inventory Management ─────────────────────────────────────────────────────

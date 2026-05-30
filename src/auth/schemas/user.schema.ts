@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document } from 'mongoose';
 import { UserRole } from '../../common/constants/user-role.enum';
 
 @Schema()
@@ -36,11 +36,29 @@ export class User {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, unique: true, lowercase: true, trim: true })
-  email: string;
+  @Prop({
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+  })
+  email?: string;
 
-  @Prop({ required: true })
-  passwordHash: string;
+  @Prop()
+  passwordHash?: string;
+
+  @Prop({
+    unique: true,
+    sparse: true,
+    trim: true,
+  })
+  phone?: string;
+
+  @Prop({ default: false })
+  isPhoneVerified: boolean;
+
+  @Prop({ default: false })
+  isEmailVerified: boolean;
 
   @Prop({
     type: String,
@@ -51,9 +69,6 @@ export class User {
 
   @Prop({ default: true })
   isActive: boolean;
-
-  @Prop()
-  phone?: string;
 
   @Prop({ type: [AddressSchema], default: [] })
   addresses: Address[];
@@ -69,7 +84,16 @@ export class User {
 
   @Prop()
   lockedUntil?: Date;
+
+  @Prop()
+  deviceTokens?: string[];
 }
 
 export type UserDocument = User & Document;
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Compound indexes for production performance
+UserSchema.index({ email: 1 }, { unique: true, sparse: true });
+UserSchema.index({ phone: 1 }, { unique: true, sparse: true });
+UserSchema.index({ role: 1, isActive: 1 });
+UserSchema.index({ createdAt: -1 });

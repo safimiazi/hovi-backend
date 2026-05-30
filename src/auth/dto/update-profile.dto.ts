@@ -7,6 +7,6 @@ export class UpdateProfileDto {
 
   @IsString()
   @IsOptional()
-  @Matches(/^[6-9]\d{9}$/, { message: 'Phone must be a valid 10-digit Indian mobile number' })
+  @Matches(/^01[3-9]\d{8}$/, { message: 'Phone must be a valid 11-digit Bangladeshi mobile number' })
   phone?: string;
 }
