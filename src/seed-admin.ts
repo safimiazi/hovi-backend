@@ -45,8 +45,8 @@ async function seed() {
   // ───────────────────────────────────────────────────────────────────────────
 
   console.log('🔌 Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI);
-  console.log('✅ Connected');
+  await mongoose.connect(MONGODB_URI, { dbName: 'hovi' });
+  console.log('✅ Connected to database: hovi');
 
   // Check if admin already exists
   const existing = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });

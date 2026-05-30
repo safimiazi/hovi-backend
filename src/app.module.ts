@@ -9,6 +9,11 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
+import { UploadModule } from './upload/upload.module';
+import { OrdersModule } from './orders/orders.module';
+import { CustomersModule } from './customers/customers.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { CouponsModule } from './coupons/coupons.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -25,6 +30,7 @@ import { RolesGuard } from './common/guards/roles.guard';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI'),
+        dbName: 'hovi',
       }),
       inject: [ConfigService],
     }),
@@ -55,6 +61,11 @@ import { RolesGuard } from './common/guards/roles.guard';
     AuthModule,
     CategoriesModule,
     ProductsModule,
+    UploadModule,
+    OrdersModule,
+    CustomersModule,
+    ReviewsModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [

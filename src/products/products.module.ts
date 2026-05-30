@@ -8,6 +8,7 @@ import {
 import { FlashSale, FlashSaleSchema } from './schemas/flash-sale.schema';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
+import { FlashSalesController } from './flash-sales.controller';
 import { CategoriesModule } from '../categories/categories.module';
 
 @Module({
@@ -19,7 +20,7 @@ import { CategoriesModule } from '../categories/categories.module';
     ]),
     CategoriesModule,
   ],
-  controllers: [ProductsController],
+  controllers: [ProductsController, FlashSalesController],
   providers: [ProductsService],
   exports: [ProductsService, MongooseModule],
 })

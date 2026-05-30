@@ -43,6 +43,8 @@ export class ProductsService {
 
   /**
    * Create a new product. Validates that the categoryId exists before creating.
+   * If variants are provided inline, they are saved with the product.
+   * If no variants are provided, a default variant is auto-created with the given stockQuantity.
    */
   async create(createProductDto: CreateProductDto): Promise<ProductDocument> {
     // Validate category exists
@@ -54,10 +56,35 @@ export class ProductsService {
       createProductDto.shortDescription,
     );
 
+    // Build variants
+    let variants: any[] = [];
+
+    if (createProductDto.variants && createProductDto.variants.length > 0) {
+      // Use provided variants
+      variants = createProductDto.variants;
+    } else {
+      // Auto-create a default variant
+      const defaultSku = createProductDto.name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 20) + '-DEFAULT';
+
+      variants = [
+        {
+          sku: defaultSku,
+          stockQuantity: createProductDto.stockQuantity ?? 0,
+          lowStockThreshold: 10,
+          isActive: true,
+        },
+      ];
+    }
+
     const product = new this.productModel({
       ...createProductDto,
       categoryId: new Types.ObjectId(createProductDto.categoryId),
       searchText,
+      variants,
     });
 
     return product.save();
