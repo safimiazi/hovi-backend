@@ -1,9 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Support URL-encoded form data from SSLCommerz IPN
+  app.use(bodyParser.urlencoded({ extended: true }));
 
   // Global API prefix
   app.setGlobalPrefix('api');

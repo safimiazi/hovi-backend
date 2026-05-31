@@ -30,8 +30,10 @@ export class ProductsController {
     @Query('limit') limit?: number,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    return this.productsService.findAll(page || 1, limit || 12, categoryId, search);
+    return this.productsService.findAll(page || 1, limit || 12, categoryId, search, sortBy, sortOrder);
   }
 
   /**

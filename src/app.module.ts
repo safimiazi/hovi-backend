@@ -14,6 +14,7 @@ import { OrdersModule } from './orders/orders.module';
 import { CustomersModule } from './customers/customers.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CouponsModule } from './coupons/coupons.module';
+import { PaymentModule } from './payment/payment.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -66,6 +67,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     CustomersModule,
     ReviewsModule,
     CouponsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [

@@ -39,7 +39,7 @@ export class OrdersService {
    * - Decrements stock atomically for each item
    * - If any item fails stock check, the order is rejected
    */
-  async create(dto: CreateOrderDto, userId?: string): Promise<OrderDocument> {
+  async create(dto: CreateOrderDto, userId?: string, transactionId?: string): Promise<OrderDocument> {
     // Step 1: Validate stock for all items BEFORE decrementing
     for (const item of dto.items) {
       if (item.sku) {
@@ -69,7 +69,7 @@ export class OrdersService {
 
     // Step 3: Calculate totals
     const subtotal = dto.items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const shippingCost = dto.deliveryMethod === 'express' ? 120 : (subtotal >= 999 ? 0 : 60);
+    const shippingCost = dto.deliveryMethod === 'express' ? 120 : (subtotal >= 999 ? 0 : 99);
     const total = subtotal + shippingCost;
 
     // Step 4: Create order
@@ -84,6 +84,7 @@ export class OrdersService {
       shippingAddress: dto.shippingAddress,
       deliveryMethod: dto.deliveryMethod,
       paymentMethod: dto.paymentMethod,
+      transactionId,
       subtotal,
       shippingCost,
       total,
@@ -175,6 +176,30 @@ export class OrdersService {
 
     const updatedOrder = await order.save();
     this.logger.log(`Order ${order.orderNumber} status: ${currentStatus} → ${dto.status}`);
+    return updatedOrder;
+  }
+
+  /**
+   * Mark a pending order paid after successful SSLCommerz validation.
+   */
+  async markOrderPaid(transactionId: string, validation: Record<string, any>): Promise<OrderDocument | null> {
+    const order = await this.orderModel.findOne({ transactionId }).exec();
+    if (!order) {
+      return null;
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      this.logger.warn(`Payment received for cancelled order ${order.orderNumber}`);
+      return order;
+    }
+
+    order.status = OrderStatus.CONFIRMED;
+    order.paymentVerified = true;
+    order.paymentVerifiedAt = new Date();
+    order.set('paymentValidation', validation);
+
+    const updatedOrder = await order.save();
+    this.logger.log(`Order payment confirmed: ${order.orderNumber} (transaction ${transactionId})`);
     return updatedOrder;
   }
 

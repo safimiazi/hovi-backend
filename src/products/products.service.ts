@@ -173,6 +173,8 @@ export class ProductsService {
     limit: number = 10,
     categoryId?: string,
     search?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'asc' | 'desc' = 'desc',
   ): Promise<{ products: (ProductDocument & { flashSalePrice?: number; flashSaleEndTime?: Date })[]; total: number; page: number; limit: number; totalPages: number }> {
     const filter: Record<string, unknown> = { isDeleted: { $ne: true } };
 
@@ -185,9 +187,16 @@ export class ProductsService {
     }
 
     const skip = (page - 1) * limit;
+    const sortDirection: 1 | -1 = sortOrder === 'asc' ? 1 : -1;
+    const sort: Record<string, 1 | -1> = {};
+    if (sortBy) {
+      sort[sortBy] = sortDirection;
+    } else {
+      sort.createdAt = -1;
+    }
 
     const [products, total] = await Promise.all([
-      this.productModel.find(filter).skip(skip).limit(limit).exec(),
+      this.productModel.find(filter).sort(sort).skip(skip).limit(limit).exec(),
       this.productModel.countDocuments(filter).exec(),
     ]);
 

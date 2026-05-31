@@ -40,10 +40,16 @@ export class ShippingAddress {
   phone: string;
 
   @Prop({ required: true })
+  email: string;
+
+  @Prop({ required: true })
   street: string;
 
   @Prop({ required: true })
   city: string;
+
+  @Prop({ required: true })
+  postcode: string;
 
   @Prop()
   area?: string;
@@ -68,8 +74,20 @@ export class Order {
   @Prop({ required: true, enum: ['standard', 'express'], default: 'standard' })
   deliveryMethod: string;
 
-  @Prop({ required: true, enum: ['cod', 'bkash', 'nagad'], default: 'cod' })
+  @Prop({ required: true, enum: ['cod', 'bkash', 'nagad', 'sslcommerz'], default: 'cod' })
   paymentMethod: string;
+
+  @Prop({ unique: true, sparse: true })
+  transactionId?: string;
+
+  @Prop({ default: false })
+  paymentVerified?: boolean;
+
+  @Prop()
+  paymentVerifiedAt?: Date;
+
+  @Prop({ type: Object })
+  paymentValidation?: Record<string, unknown>;
 
   @Prop({ required: true, min: 0 })
   subtotal: number;

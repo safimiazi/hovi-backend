@@ -1,18 +1,17 @@
+import { Type } from 'class-transformer';
 import {
+  IsArray,
+  ArrayMinSize,
+  ValidateNested,
+  IsOptional,
+  IsEnum,
   IsString,
   IsNumber,
-  IsOptional,
-  IsArray,
-  IsEnum,
-  IsMongoId,
-  IsEmail,
   Min,
-  ValidateNested,
-  ArrayMinSize,
+  IsEmail,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
-class OrderItemDto {
+class PaymentOrderItemDto {
   @IsString()
   productId: string;
 
@@ -44,7 +43,7 @@ class OrderItemDto {
   variantLabel?: string;
 }
 
-class ShippingAddressDto {
+class PaymentShippingAddressDto {
   @IsString()
   name: string;
 
@@ -72,20 +71,18 @@ class ShippingAddressDto {
   note?: string;
 }
 
-export class CreateOrderDto {
+export class CreateSslCommerzPaymentDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => OrderItemDto)
-  items: OrderItemDto[];
+  @Type(() => PaymentOrderItemDto)
+  items: PaymentOrderItemDto[];
 
   @ValidateNested()
-  @Type(() => ShippingAddressDto)
-  shippingAddress: ShippingAddressDto;
+  @Type(() => PaymentShippingAddressDto)
+  shippingAddress: PaymentShippingAddressDto;
 
+  @IsOptional()
   @IsEnum(['standard', 'express'])
-  deliveryMethod: 'standard' | 'express';
-
-  @IsEnum(['cod', 'bkash', 'nagad', 'sslcommerz'])
-  paymentMethod: 'cod' | 'bkash' | 'nagad' | 'sslcommerz';
+  deliveryMethod?: 'standard' | 'express';
 }
