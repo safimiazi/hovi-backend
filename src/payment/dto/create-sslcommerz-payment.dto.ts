@@ -85,4 +85,13 @@ export class CreateSslCommerzPaymentDto {
   @IsOptional()
   @IsEnum(['standard', 'express'])
   deliveryMethod?: 'standard' | 'express';
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number;
 }

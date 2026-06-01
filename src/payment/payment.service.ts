@@ -1,14 +1,20 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService } from '../orders/orders.service';
+import { CouponsService } from '../coupons/coupons.service';
+import { CustomersService } from '../customers/customers.service';
 import { CreateSslCommerzPaymentDto } from './dto/create-sslcommerz-payment.dto';
 import { OrderDocument } from '../orders/schemas/order.schema';
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly ordersService: OrdersService,
+    private readonly couponsService: CouponsService,
+    private readonly customersService: CustomersService,
   ) {}
 
   private get storeId(): string {
@@ -72,14 +78,30 @@ export class PaymentService {
     const deliveryMethod = dto.deliveryMethod ?? 'standard';
     const transactionId = this.buildTransactionId();
 
+    // Auto-create or find customer by phone so every order is linked to a user
+    let userId: string | undefined;
+    try {
+      userId = await this.customersService.findOrCreateByPhone(
+        dto.shippingAddress.phone,
+        dto.shippingAddress.name,
+        dto.shippingAddress.email,
+      );
+      this.logger.log(`Order linked to customer: ${userId}`);
+    } catch (err: any) {
+      // Non-fatal — order can still be placed without a userId
+      this.logger.warn(`Could not find/create customer: ${err.message}`);
+    }
+
     const order = await this.ordersService.create(
       {
         items: dto.items,
         shippingAddress: dto.shippingAddress,
         deliveryMethod,
         paymentMethod,
+        couponCode: dto.couponCode,
+        discountAmount: dto.discountAmount,
       },
-      undefined,
+      userId,
       transactionId,
     );
 
@@ -93,6 +115,15 @@ export class PaymentService {
     if (!order) {
       throw new NotFoundException(`Order not found for transaction id ${tranId}`);
     }
+
+    if (order.couponCode) {
+      try {
+        await this.couponsService.incrementUsage(order.couponCode);
+      } catch {
+        // Do not stop order confirmation if coupon usage increment fails.
+      }
+    }
+
     return order;
   }
 

@@ -47,6 +47,11 @@ export class CreateCouponDto {
   @Min(1)
   perUserLimit?: number;
 
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  applicableProducts?: string[];
+
   @Type(() => Date)
   @IsDate()
   validFrom: Date;

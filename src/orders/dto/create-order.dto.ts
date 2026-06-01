@@ -88,4 +88,13 @@ export class CreateOrderDto {
 
   @IsEnum(['cod', 'bkash', 'nagad', 'sslcommerz'])
   paymentMethod: 'cod' | 'bkash' | 'nagad' | 'sslcommerz';
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number;
 }

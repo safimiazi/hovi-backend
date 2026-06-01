@@ -80,6 +80,9 @@ export class Order {
   @Prop({ unique: true, sparse: true })
   transactionId?: string;
 
+  @Prop()
+  couponCode?: string;
+
   @Prop({ default: false })
   paymentVerified?: boolean;
 
@@ -91,6 +94,9 @@ export class Order {
 
   @Prop({ required: true, min: 0 })
   subtotal: number;
+
+  @Prop({ default: 0 })
+  discountAmount?: number;
 
   @Prop({ required: true, min: 0 })
   shippingCost: number;

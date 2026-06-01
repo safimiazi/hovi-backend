@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto, UpdateCouponDto, ValidateCouponDto } from './dto';
-import { Public, Roles } from '../common/decorators';
+import { Public, Roles, CurrentUser } from '../common/decorators';
 import { UserRole } from '../common/constants/user-role.enum';
 
 @Controller('coupons')
@@ -22,9 +22,20 @@ export class CouponsController {
   /**
    * Validate a coupon code and return the discount amount.
    */
+  @Public()
   @Post('validate')
-  validate(@Body() dto: ValidateCouponDto) {
-    return this.couponsService.validate(dto.code, dto.orderAmount);
+  validate(@Body() dto: ValidateCouponDto, @CurrentUser() user?: { userId: string }) {
+    return this.couponsService.validate(dto.code, dto.orderAmount, {
+      items: dto.items,
+      userId: user?.userId,
+      userEmail: dto.userEmail,
+    });
+  }
+
+  @Public()
+  @Get('active')
+  findActive() {
+    return this.couponsService.findActive();
   }
 
   // ─── Admin Endpoints ───────────────────────────────────────────────────────

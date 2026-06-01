@@ -107,4 +107,66 @@ export class CustomersService {
 
     return { total, active, inactive: total - active, newThisMonth };
   }
+
+  /**
+   * Find an existing customer by phone, or create a new guest account.
+   * Used during checkout to ensure every order is linked to a user record.
+   * Returns the user's ID.
+   */
+  async findOrCreateByPhone(
+    phone: string,
+    name: string,
+    email?: string,
+  ): Promise<string> {
+    // Normalize phone — strip leading zeros/country code for consistent matching
+    const normalizedPhone = phone.replace(/^(\+88|88|0)/, '').replace(/\D/g, '');
+    const phoneVariants = [normalizedPhone, `0${normalizedPhone}`];
+
+    // Try to find existing user by phone
+    let user = await this.userModel
+      .findOne({ phone: { $in: phoneVariants }, role: UserRole.CUSTOMER })
+      .exec();
+
+    if (user) {
+      // Update name/email if missing
+      let changed = false;
+      if (!user.name || user.name.startsWith('User ')) {
+        user.name = name;
+        changed = true;
+      }
+      if (email && !user.email) {
+        user.email = email.toLowerCase();
+        changed = true;
+      }
+      if (changed) await user.save();
+      return user._id.toString();
+    }
+
+    // Also try by email if provided
+    if (email) {
+      user = await this.userModel
+        .findOne({ email: email.toLowerCase(), role: UserRole.CUSTOMER })
+        .exec();
+
+      if (user) {
+        // Link phone to existing email account if not already set
+        if (!user.phone) {
+          user.phone = `0${normalizedPhone}`;
+          await user.save();
+        }
+        return user._id.toString();
+      }
+    }
+
+    // Create new guest customer
+    const newUser = await this.userModel.create({
+      name,
+      phone: `0${normalizedPhone}`,
+      email: email ? email.toLowerCase() : undefined,
+      role: UserRole.CUSTOMER,
+      isActive: true,
+    });
+
+    return newUser._id.toString();
+  }
 }

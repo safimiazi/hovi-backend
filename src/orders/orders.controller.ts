@@ -64,6 +64,15 @@ export class OrdersController {
   }
 
   /**
+   * Admin: Get revenue grouped by day for the last N days.
+   */
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Get('admin/revenue-chart')
+  async getRevenueChart(@Query('days') days?: number) {
+    return this.ordersService.getRevenueChart(days || 7);
+  }
+
+  /**
    * Admin: Get a specific order (no ownership check).
    */
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)

@@ -4,22 +4,35 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Coupon, CouponDocument, DiscountType } from './schemas/coupon.schema';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class CouponsService {
   constructor(
     @InjectModel(Coupon.name)
     private readonly couponModel: Model<CouponDocument>,
+    @InjectModel(Order.name)
+    private readonly orderModel: Model<OrderDocument>,
+    private readonly productsService: ProductsService,
   ) {}
 
   /**
    * Validate a coupon code and return the calculated discount.
    */
-  async validate(code: string, orderAmount: number) {
+  async validate(
+    code: string,
+    orderAmount: number,
+    options?: {
+      items?: Array<{ productId: string; sku?: string; qty: number; price: number }>;
+      userId?: string;
+      userEmail?: string;
+    },
+  ) {
     const coupon = await this.couponModel
       .findOne({ code: code.toUpperCase() })
       .exec();
@@ -46,26 +59,105 @@ export class CouponsService {
       throw new BadRequestException('This coupon has reached its usage limit');
     }
 
-    if (orderAmount < coupon.minimumOrderAmount) {
+    const items = options?.items;
+    const restrictionsEnabled =
+      (coupon.applicableProducts?.length || 0) > 0 ||
+      (coupon.applicableCategories?.length || 0) > 0;
+
+    if (restrictionsEnabled && (!items || items.length === 0)) {
       throw new BadRequestException(
-        `Minimum order amount of ${coupon.minimumOrderAmount} required`,
+        'Coupon restrictions require cart item details to validate this coupon.',
       );
     }
 
-    // Calculate discount
+    let eligibleAmount = orderAmount;
+
+    if (restrictionsEnabled && items) {
+      eligibleAmount = 0;
+      for (const item of items) {
+        const product = await this.productsService.findById(item.productId);
+        const variant = item.sku
+          ? (product.variants as any).find((variant: any) => variant.sku === item.sku)
+          : undefined;
+
+        // findById enriches the returned object with flashSalePrice when active
+        const flashSalePrice: number | undefined = (product as any).flashSalePrice;
+        const expectedPrice =
+          flashSalePrice ??
+          (variant?.priceOverride ?? product.basePrice);
+
+        if (item.price !== expectedPrice) {
+          throw new BadRequestException(
+            `Price mismatch for product ${product.name}. Expected ৳${expectedPrice} but received ৳${item.price}.`,
+          );
+        }
+
+        const categoryId = product.categoryId?.toString();
+        const productMatches = coupon.applicableProducts?.some((id) => id.toString() === item.productId);
+        const categoryMatches = coupon.applicableCategories?.some(
+          (id) => id.toString() === categoryId,
+        );
+
+        if (productMatches || categoryMatches) {
+          eligibleAmount += item.price * item.qty;
+        }
+      }
+
+      if (eligibleAmount <= 0) {
+        throw new BadRequestException(
+          'This coupon does not apply to any item in your cart.',
+        );
+      }
+    }
+
+    if (eligibleAmount < (coupon.minimumOrderAmount || 0)) {
+      throw new BadRequestException(
+        `Minimum order amount of ${coupon.minimumOrderAmount} required for this coupon.`,
+      );
+    }
+
+    if (coupon.perUserLimit) {
+      if (!options?.userId && !options?.userEmail) {
+        throw new BadRequestException(
+          'Please login or provide a valid email to use this coupon.',
+        );
+      }
+
+      const userQuery: Record<string, unknown> = {
+        couponCode: coupon.code,
+        paymentVerified: true,
+      };
+
+      if (options.userId) {
+        userQuery.userId = new Types.ObjectId(options.userId);
+      } else if (options.userEmail) {
+        userQuery['shippingAddress.email'] = options.userEmail.toLowerCase();
+      }
+
+      const userUsageCount = await this.orderModel.countDocuments(userQuery).exec();
+      if (userUsageCount >= coupon.perUserLimit) {
+        throw new BadRequestException(
+          'You have already used this coupon the maximum number of times.',
+        );
+      }
+    }
+
     let discount: number;
 
     if (coupon.discountType === DiscountType.PERCENTAGE) {
-      discount = (orderAmount * coupon.discountValue) / 100;
-      // Apply maximum discount cap if set
-      if (coupon.maximumDiscount && discount > coupon.maximumDiscount) {
-        discount = coupon.maximumDiscount;
-      }
+      discount = (eligibleAmount * coupon.discountValue) / 100;
     } else {
       discount = coupon.discountValue;
     }
 
-    // Discount cannot exceed order amount
+    if (coupon.maximumDiscount && discount > coupon.maximumDiscount) {
+      discount = coupon.maximumDiscount;
+    }
+
+    if (discount > eligibleAmount) {
+      discount = eligibleAmount;
+    }
+
     if (discount > orderAmount) {
       discount = orderAmount;
     }
@@ -78,6 +170,19 @@ export class CouponsService {
       calculatedDiscount: Math.round(discount * 100) / 100,
       finalAmount: Math.round((orderAmount - discount) * 100) / 100,
     };
+  }
+
+  async findActive() {
+    const now = new Date();
+    return this.couponModel
+      .find({
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+      })
+      .select('code description discountType discountValue minimumOrderAmount maximumDiscount')
+      .sort({ discountValue: -1, validUntil: 1 })
+      .exec();
   }
 
   /**

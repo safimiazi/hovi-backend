@@ -12,6 +12,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus, ORDER_STATUS_TRANSITIONS } from '../common/constants/order-status.enum';
 import { ProductsService } from '../products/products.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 @Injectable()
 export class OrdersService {
@@ -21,6 +22,7 @@ export class OrdersService {
     @InjectModel(Order.name)
     private readonly orderModel: Model<OrderDocument>,
     private readonly productsService: ProductsService,
+    private readonly couponsService: CouponsService,
   ) {}
 
   /**
@@ -52,14 +54,42 @@ export class OrdersService {
       }
     }
 
-    // Step 2: Decrement stock for all items
-    for (const item of dto.items) {
+    // Step 2: Validate pricing and prepare order items
+    const validatedItems = await Promise.all(
+      dto.items.map(async (item) => {
+        const product = await this.productsService.findById(item.productId);
+        const variant = item.sku
+          ? (product.variants as any).find((v: any) => v.sku === item.sku)
+          : undefined;
+
+        if (item.sku && !variant) {
+          throw new NotFoundException(`Variant with SKU "${item.sku}" not found for product "${item.name}"`);
+        }
+
+        // findById enriches the returned object with flashSalePrice when active
+        const flashSalePrice: number | undefined = (product as any).flashSalePrice;
+        const expectedPrice = flashSalePrice ?? (variant?.priceOverride ?? product.basePrice);
+
+        if (item.price !== expectedPrice) {
+          throw new BadRequestException(
+            `Price mismatch for "${item.name}". Expected ৳${expectedPrice.toLocaleString()}, received ৳${item.price.toLocaleString()}`,
+          );
+        }
+
+        return {
+          ...item,
+          price: expectedPrice,
+        };
+      }),
+    );
+
+    // Step 3: Decrement stock for all items
+    for (const item of validatedItems) {
       if (item.sku) {
         try {
           await this.productsService.decrementStock(item.productId, item.sku, item.qty);
           this.logger.log(`Stock decremented: ${item.name} (SKU: ${item.sku}) × ${item.qty}`);
         } catch (error: any) {
-          // If decrement fails (race condition), throw error
           throw new BadRequestException(
             `Failed to reserve stock for "${item.name}": ${error.message}`,
           );
@@ -67,17 +97,33 @@ export class OrdersService {
       }
     }
 
-    // Step 3: Calculate totals
-    const subtotal = dto.items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    // Step 4: Calculate totals
+    const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
     const shippingCost = dto.deliveryMethod === 'express' ? 120 : (subtotal >= 999 ? 0 : 99);
-    const total = subtotal + shippingCost;
+    let discountAmount = 0;
 
-    // Step 4: Create order
+    if (dto.couponCode) {
+      const validationResult = await this.couponsService.validate(dto.couponCode, subtotal, {
+        items: validatedItems.map((item) => ({
+          productId: item.productId,
+          sku: item.sku,
+          qty: item.qty,
+          price: item.price,
+        })),
+        userId,
+        userEmail: dto.shippingAddress.email,
+      });
+      discountAmount = validationResult.calculatedDiscount;
+    }
+
+    const total = Math.max(0, subtotal + shippingCost - discountAmount);
+
+    // Step 5: Create order
     const orderNumber = await this.generateOrderNumber();
 
     const order = new this.orderModel({
       userId: userId ? new Types.ObjectId(userId) : undefined,
-      items: dto.items.map((item) => ({
+      items: validatedItems.map((item) => ({
         ...item,
         productId: new Types.ObjectId(item.productId),
       })),
@@ -85,6 +131,8 @@ export class OrdersService {
       deliveryMethod: dto.deliveryMethod,
       paymentMethod: dto.paymentMethod,
       transactionId,
+      couponCode: dto.couponCode?.trim().toUpperCase(),
+      discountAmount,
       subtotal,
       shippingCost,
       total,
@@ -254,5 +302,52 @@ export class OrdersService {
     const revenue = revenueResult[0]?.total || 0;
 
     return { total, pending, confirmed, processing, shipped, delivered, cancelled, revenue };
+  }
+
+  /**
+   * Admin: Get revenue grouped by day for the last N days.
+   */
+  async getRevenueChart(days: number = 7): Promise<{ date: string; revenue: number; orders: number }[]> {
+    const since = new Date();
+    since.setDate(since.getDate() - (days - 1));
+    since.setHours(0, 0, 0, 0);
+
+    const result = await this.orderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: since },
+          status: { $in: [OrderStatus.DELIVERED, OrderStatus.SHIPPED, OrderStatus.PROCESSING, OrderStatus.CONFIRMED] },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' },
+          },
+          revenue: { $sum: '$total' },
+          orders: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
+    ]).exec();
+
+    // Build a full date range with 0s for missing days
+    const map = new Map<string, { revenue: number; orders: number }>();
+    for (const r of result) {
+      const key = `${r._id.year}-${String(r._id.month).padStart(2, '0')}-${String(r._id.day).padStart(2, '0')}`;
+      map.set(key, { revenue: r.revenue, orders: r.orders });
+    }
+
+    const output: { date: string; revenue: number; orders: number }[] = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      output.push({ date: key, ...(map.get(key) ?? { revenue: 0, orders: 0 }) });
+    }
+
+    return output;
   }
 }

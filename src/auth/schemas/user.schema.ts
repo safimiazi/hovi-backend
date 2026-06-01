@@ -19,8 +19,8 @@ export class Address {
   @Prop({ required: true })
   state: string;
 
-  @Prop({ required: true, match: /^[1-9][0-9]{5}$/ })
-  pincode: string;
+  @Prop({ required: true })
+  postcode: string;
 
   @Prop()
   phone?: string;

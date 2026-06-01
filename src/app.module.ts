@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { BullModule } from '@nestjs/bull';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +14,7 @@ import { CustomersModule } from './customers/customers.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PaymentModule } from './payment/payment.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -46,18 +46,6 @@ import { RolesGuard } from './common/guards/roles.guard';
       ],
     }),
 
-    // Bull queue for background jobs (emails, etc.)
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        redis: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
-      }),
-      inject: [ConfigService],
-    }),
-
     // Feature modules
     AuthModule,
     CategoriesModule,
@@ -68,6 +56,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     ReviewsModule,
     CouponsModule,
     PaymentModule,
+    AnnouncementsModule,
   ],
   controllers: [AppController],
   providers: [

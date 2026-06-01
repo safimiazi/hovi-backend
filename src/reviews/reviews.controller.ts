@@ -32,6 +32,16 @@ export class ReviewsController {
     return this.reviewsService.findByProduct(productId, page || 1, limit || 10);
   }
 
+  /**
+   * Get featured/top reviews for the home page (public).
+   * Returns top-rated approved reviews with user and product info.
+   */
+  @Public()
+  @Get('featured')
+  getFeatured(@Query('limit') limit?: number) {
+    return this.reviewsService.getFeatured(limit || 6);
+  }
+
   // ─── Authenticated Customer Endpoints ──────────────────────────────────────
 
   /**

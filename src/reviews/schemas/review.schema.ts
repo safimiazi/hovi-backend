@@ -24,7 +24,7 @@ export class Review {
   @Prop({ default: false })
   isVerifiedPurchase: boolean;
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isApproved: boolean;
 
   @Prop({ default: 0 })

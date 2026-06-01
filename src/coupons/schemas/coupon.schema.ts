@@ -32,8 +32,8 @@ export class Coupon {
   @Prop({ default: 0 })
   usedCount: number;
 
-  @Prop({ default: 1 })
-  perUserLimit: number;
+  @Prop()
+  perUserLimit?: number;
 
   @Prop({ required: true })
   validFrom: Date;
@@ -43,6 +43,9 @@ export class Coupon {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: [Types.ObjectId], ref: 'Product', default: [] })
+  applicableProducts: Types.ObjectId[];
 
   @Prop({ type: [Types.ObjectId], ref: 'Category', default: [] })
   applicableCategories: Types.ObjectId[];

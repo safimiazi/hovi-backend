@@ -55,6 +55,20 @@ export class ReviewsService {
   }
 
   /**
+   * Get featured reviews for the home page.
+   * Returns top-rated approved reviews with user and product info.
+   */
+  async getFeatured(limit: number = 6) {
+    return this.reviewModel
+      .find({ isApproved: true, rating: { $gte: 4 } })
+      .populate('userId', 'name')
+      .populate('productId', 'name images')
+      .sort({ rating: -1, helpfulCount: -1, createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  /**
    * Create a review. Checks for verified purchase and prevents duplicate reviews.
    */
   async create(userId: string, dto: CreateReviewDto) {
