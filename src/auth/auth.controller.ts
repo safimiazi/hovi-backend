@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -187,5 +188,44 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(user.userId, updateProfileDto);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FAVORITES
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get current user's favorite product IDs.
+   */
+  @Get('me/favorites')
+  async getFavorites(@CurrentUser() user: { userId: string }): Promise<{ favorites: string[] }> {
+    const favorites = await this.authService.getFavorites(user.userId);
+    return { favorites };
+  }
+
+  /**
+   * Add a product to favorites.
+   */
+  @Post('me/favorites/:productId')
+  @HttpCode(HttpStatus.OK)
+  async addFavorite(
+    @CurrentUser() user: { userId: string },
+    @Param('productId') productId: string,
+  ): Promise<{ favorites: string[] }> {
+    const favorites = await this.authService.addFavorite(user.userId, productId);
+    return { favorites };
+  }
+
+  /**
+   * Remove a product from favorites.
+   */
+  @Delete('me/favorites/:productId')
+  @HttpCode(HttpStatus.OK)
+  async removeFavorite(
+    @CurrentUser() user: { userId: string },
+    @Param('productId') productId: string,
+  ): Promise<{ favorites: string[] }> {
+    const favorites = await this.authService.removeFavorite(user.userId, productId);
+    return { favorites };
   }
 }

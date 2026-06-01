@@ -156,6 +156,14 @@ export class OrdersService {
   }
 
   /**
+   * Find an order by transaction ID — used on the payment result page.
+   * Returns null if not found (don't throw, let controller handle).
+   */
+  async findByTransactionId(transactionId: string): Promise<OrderDocument | null> {
+    return this.orderModel.findOne({ transactionId }).exec();
+  }
+
+  /**
    * Get a single order by ID. Validates ownership for non-admin users.
    */
   async findById(orderId: string, userId?: string): Promise<OrderDocument> {

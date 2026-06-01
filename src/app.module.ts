@@ -15,6 +15,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { PaymentModule } from './payment/payment.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -57,6 +58,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     CouponsModule,
     PaymentModule,
     AnnouncementsModule,
+    NewsletterModule,
   ],
   controllers: [AppController],
   providers: [

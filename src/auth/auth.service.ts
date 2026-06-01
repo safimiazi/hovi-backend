@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -426,6 +426,50 @@ export class AuthService {
       isActive: user.isActive,
       addresses: user.addresses,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FAVORITES
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  async getFavorites(userId: string): Promise<string[]> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('favoriteProducts')
+      .lean<{ favoriteProducts?: Types.ObjectId[] }>();
+    if (!user) throw new UnauthorizedException('User not found');
+    // favoriteProducts may be missing on older documents — default to []
+    return (user.favoriteProducts ?? []).map((id) => id.toString());
+  }
+
+  async addFavorite(userId: string, productId: string): Promise<string[]> {
+    const user = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $addToSet: { favoriteProducts: new Types.ObjectId(productId) },
+        },
+        { new: true, upsert: false },
+      )
+      .select('favoriteProducts')
+      .lean<{ favoriteProducts?: Types.ObjectId[] }>();
+    if (!user) throw new UnauthorizedException('User not found');
+    return (user.favoriteProducts ?? []).map((id) => id.toString());
+  }
+
+  async removeFavorite(userId: string, productId: string): Promise<string[]> {
+    const user = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $pull: { favoriteProducts: new Types.ObjectId(productId) },
+        },
+        { new: true },
+      )
+      .select('favoriteProducts')
+      .lean<{ favoriteProducts?: Types.ObjectId[] }>();
+    if (!user) throw new UnauthorizedException('User not found');
+    return (user.favoriteProducts ?? []).map((id) => id.toString());
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

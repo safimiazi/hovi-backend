@@ -17,8 +17,8 @@ export class PaymentController {
   @Public()
   @Post('sslcommerz/init')
   async initiate(@Body() dto: CreateSslCommerzPaymentDto) {
-    const { redirectUrl } = await this.paymentService.initiateSslCommerzPayment(dto);
-    return { success: true, redirectUrl };
+    const { redirectUrl, transactionId } = await this.paymentService.initiateSslCommerzPayment(dto);
+    return { success: true, redirectUrl, transactionId };
   }
 
   @Public()

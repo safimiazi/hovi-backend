@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { UserRole } from '../../common/constants/user-role.enum';
 
 @Schema()
@@ -87,6 +87,9 @@ export class User {
 
   @Prop()
   deviceTokens?: string[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
+  favoriteProducts: Types.ObjectId[];
 }
 
 export type UserDocument = User & Document;

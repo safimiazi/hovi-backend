@@ -32,6 +32,16 @@ export class OrdersController {
   }
 
   /**
+   * Look up an order by transaction ID — used on the payment result page.
+   * Public so unauthenticated users can see their order after checkout.
+   */
+  @Public()
+  @Get('by-transaction/:transactionId')
+  async getByTransactionId(@Param('transactionId') transactionId: string) {
+    return this.ordersService.findByTransactionId(transactionId);
+  }
+
+  /**
    * Get current user's orders.
    */
   @Get('my')
