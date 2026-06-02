@@ -5,6 +5,7 @@ import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { ProductsModule } from '../products/products.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { BundlesModule } from '../bundles/bundles.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     ]),
     ProductsModule,
     CouponsModule,
+    BundlesModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

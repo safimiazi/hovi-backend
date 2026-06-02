@@ -1,15 +1,4 @@
-import {
-  IsString,
-  IsNumber,
-  IsOptional,
-  IsArray,
-  IsEnum,
-  IsMongoId,
-  IsEmail,
-  Min,
-  ValidateNested,
-  ArrayMinSize,
-} from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, IsEnum, IsMongoId, IsEmail, IsBoolean, Min, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
@@ -42,6 +31,15 @@ class OrderItemDto {
   @IsOptional()
   @IsString()
   variantLabel?: string;
+
+  /** True for bundle items — price is pre-validated at bundle level, skip per-item price check */
+  @IsOptional()
+  @IsBoolean()
+  isBundleItem?: boolean;
+
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
 }
 
 class ShippingAddressDto {

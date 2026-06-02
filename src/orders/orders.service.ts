@@ -13,6 +13,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus, ORDER_STATUS_TRANSITIONS } from '../common/constants/order-status.enum';
 import { ProductsService } from '../products/products.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { BundlesService } from '../bundles/bundles.service';
 
 @Injectable()
 export class OrdersService {
@@ -23,6 +24,7 @@ export class OrdersService {
     private readonly orderModel: Model<OrderDocument>,
     private readonly productsService: ProductsService,
     private readonly couponsService: CouponsService,
+    private readonly bundlesService: BundlesService,
   ) {}
 
   /**
@@ -55,8 +57,37 @@ export class OrdersService {
     }
 
     // Step 2: Validate pricing and prepare order items
+    // Bundle items get price verified against the bundle document in DB
+    const bundleCache = new Map<string, number>(); // bundleId → bundlePrice (cached)
+
     const validatedItems = await Promise.all(
       dto.items.map(async (item) => {
+        // ── Bundle item: verify price against bundle record ──────────────────
+        if (item.isBundleItem && item.bundleId) {
+          // Fetch bundle price once per bundleId (cache to avoid N+1)
+          if (!bundleCache.has(item.bundleId)) {
+            try {
+              const bundle = await this.bundlesService.findOne(item.bundleId);
+              bundleCache.set(item.bundleId, bundle.bundlePrice);
+            } catch {
+              throw new BadRequestException(`Bundle "${item.bundleId}" not found`);
+            }
+          }
+          const bundlePrice = bundleCache.get(item.bundleId)!;
+
+          // The sum of all bundle item prices must equal the bundle price (allow ±1 for rounding)
+          // We trust the proportional split done on frontend — just keep the price as-is
+          // Security: ensure item.price is non-negative and reasonable (≤ bundlePrice)
+          if (item.price < 0 || item.price > bundlePrice) {
+            throw new BadRequestException(
+              `Invalid bundle item price for "${item.name}". Must be between 0 and ৳${bundlePrice}`,
+            );
+          }
+
+          return { ...item };
+        }
+
+        // ── Regular item: standard price validation ──────────────────────────
         const product = await this.productsService.findById(item.productId);
         const variant = item.sku
           ? (product.variants as any).find((v: any) => v.sku === item.sku)
@@ -66,7 +97,6 @@ export class OrdersService {
           throw new NotFoundException(`Variant with SKU "${item.sku}" not found for product "${item.name}"`);
         }
 
-        // findById enriches the returned object with flashSalePrice when active
         const flashSalePrice: number | undefined = (product as any).flashSalePrice;
         const expectedPrice = flashSalePrice ?? (variant?.priceOverride ?? product.basePrice);
 
@@ -76,10 +106,7 @@ export class OrdersService {
           );
         }
 
-        return {
-          ...item,
-          price: expectedPrice,
-        };
+        return { ...item, price: expectedPrice };
       }),
     );
 

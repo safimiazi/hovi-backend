@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsString,
   IsNumber,
+  IsBoolean,
   Min,
   IsEmail,
 } from 'class-validator';
@@ -41,6 +42,14 @@ class PaymentOrderItemDto {
   @IsOptional()
   @IsString()
   variantLabel?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isBundleItem?: boolean;
+
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
 }
 
 class PaymentShippingAddressDto {

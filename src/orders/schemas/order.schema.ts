@@ -27,6 +27,12 @@ export class OrderItem {
 
   @Prop()
   variantLabel?: string;
+
+  @Prop({ default: false })
+  isBundleItem?: boolean;
+
+  @Prop()
+  bundleId?: string;
 }
 
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
