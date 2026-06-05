@@ -34,6 +34,14 @@ export class CustomersController {
   }
 
   /**
+   * Get full customer details: profile + orders + activity stats.
+   */
+  @Get(':id/details')
+  getDetails(@Param('id') id: string) {
+    return this.customersService.getCustomerDetails(id);
+  }
+
+  /**
    * Toggle customer active/inactive status.
    */
   @Put(':id/toggle-active')

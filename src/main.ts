@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -8,6 +9,9 @@ async function bootstrap() {
 
   // Support URL-encoded form data from SSLCommerz IPN
   app.use(bodyParser.urlencoded({ extended: true }));
+
+  // Parse cookies — required for HttpOnly refresh token
+  app.use(cookieParser());
 
   // Global API prefix
   app.setGlobalPrefix('api');
@@ -38,7 +42,8 @@ async function bootstrap() {
       return callback(new Error(`CORS: origin ${origin} not allowed`), false);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // Required for cookies to be sent cross-origin
   });
 
   const port = process.env.PORT || 4000;

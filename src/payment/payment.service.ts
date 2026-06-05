@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService } from '../orders/orders.service';
 import { CouponsService } from '../coupons/coupons.service';
@@ -68,7 +69,8 @@ export class PaymentService {
   }
 
   private buildTransactionId(): string {
-    return `HOVI-${Date.now()}-${Math.floor(Math.random() * 900000 + 100000)}`;
+    // UUID v4 — cryptographically random, not guessable
+    return `HOVI-${randomUUID()}`;
   }
 
   async initiateSslCommerzPayment(dto: CreateSslCommerzPaymentDto): Promise<{ redirectUrl: string; transactionId: string }> {

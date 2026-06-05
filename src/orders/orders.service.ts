@@ -14,6 +14,7 @@ import { OrderStatus, ORDER_STATUS_TRANSITIONS } from '../common/constants/order
 import { ProductsService } from '../products/products.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { BundlesService } from '../bundles/bundles.service';
+import { ShippingService } from '../shipping/shipping.service';
 
 @Injectable()
 export class OrdersService {
@@ -25,6 +26,7 @@ export class OrdersService {
     private readonly productsService: ProductsService,
     private readonly couponsService: CouponsService,
     private readonly bundlesService: BundlesService,
+    private readonly shippingService: ShippingService,
   ) {}
 
   /**
@@ -126,7 +128,7 @@ export class OrdersService {
 
     // Step 4: Calculate totals
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const shippingCost = dto.deliveryMethod === 'express' ? 120 : (subtotal >= 999 ? 0 : 99);
+    const shippingCost = await this.shippingService.calculateShipping(subtotal, dto.deliveryMethod as 'standard' | 'express');
     let discountAmount = 0;
 
     if (dto.couponCode) {

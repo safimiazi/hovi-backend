@@ -26,6 +26,7 @@ import {
   CreateAdminDto,
   SendOtpDto,
   VerifyOtpDto,
+  InternalTokenResponse,
 } from './dto';
 import { UserRole } from '../common/constants/user-role.enum';
 
@@ -110,7 +111,7 @@ export class AuthService {
     return response;
   }
 
-  async verifyOtpAndLogin(verifyOtpDto: VerifyOtpDto): Promise<TokenResponseDto> {
+  async verifyOtpAndLogin(verifyOtpDto: VerifyOtpDto): Promise<InternalTokenResponse> {
     const { phone, otp } = verifyOtpDto;
 
     // Find the latest unused OTP for this phone
@@ -189,7 +190,7 @@ export class AuthService {
   // EMAIL + PASSWORD FLOW (Customer alternative & Admin)
   // ─────────────────────────────────────────────────────────────────────────────
 
-  async register(registerDto: RegisterDto): Promise<TokenResponseDto> {
+  async register(registerDto: RegisterDto): Promise<InternalTokenResponse> {
     const { name, email, password, phone } = registerDto;
 
     // Check for duplicate email
@@ -234,7 +235,7 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto): Promise<TokenResponseDto> {
+  async login(loginDto: LoginDto): Promise<InternalTokenResponse> {
     const { email, password } = loginDto;
 
     // Find user by email
@@ -307,7 +308,7 @@ export class AuthService {
   // TOKEN MANAGEMENT
   // ─────────────────────────────────────────────────────────────────────────────
 
-  async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {
+  async refreshTokens(refreshToken: string): Promise<InternalTokenResponse> {
     const tokenHash = this.hashToken(refreshToken);
 
     const storedToken = await this.refreshTokenModel.findOne({

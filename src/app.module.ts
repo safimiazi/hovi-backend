@@ -17,6 +17,7 @@ import { PaymentModule } from './payment/payment.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { BundlesModule } from './bundles/bundles.module';
+import { ShippingModule } from './shipping/shipping.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -61,6 +62,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     AnnouncementsModule,
     NewsletterModule,
     BundlesModule,
+    ShippingModule,
   ],
   controllers: [AppController],
   providers: [

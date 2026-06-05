@@ -6,7 +6,10 @@ import {
   Body,
   Param,
   Query,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto';
 import { CurrentUser, Public, Roles } from '../common/decorators';
@@ -33,12 +36,44 @@ export class OrdersController {
 
   /**
    * Look up an order by transaction ID — used on the payment result page.
-   * Public so unauthenticated users can see their order after checkout.
+   * Requires the customer's phone number to verify ownership.
+   * Rate-limited to prevent enumeration / brute-force attacks.
+   *
+   * Security model:
+   *  - Transaction IDs are UUIDs (unguessable)
+   *  - Phone check adds a second factor: even if someone guesses the tran_id,
+   *    they still need the exact phone number used at checkout
+   *  - 10 requests per minute per IP to prevent brute-forcing phone numbers
    */
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Get('by-transaction/:transactionId')
-  async getByTransactionId(@Param('transactionId') transactionId: string) {
-    return this.ordersService.findByTransactionId(transactionId);
+  async getByTransactionId(
+    @Param('transactionId') transactionId: string,
+    @Query('phone') phone: string,
+  ) {
+    if (!phone || phone.trim().length < 10) {
+      throw new BadRequestException('phone query parameter is required');
+    }
+
+    const order = await this.ordersService.findByTransactionId(transactionId);
+
+    if (!order) {
+      // Return 404 regardless of reason — don't reveal whether tran_id exists
+      throw new NotFoundException('Order not found');
+    }
+
+    // Verify phone matches — strip non-digits for flexible matching
+    const normalize = (p: string) => p.replace(/\D/g, '');
+    const orderPhone = normalize(order.shippingAddress.phone);
+    const requestPhone = normalize(phone);
+
+    if (!orderPhone || !orderPhone.endsWith(requestPhone) && !requestPhone.endsWith(orderPhone)) {
+      // Same 404 — don't leak that tran_id exists but phone was wrong
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
   }
 
   /**

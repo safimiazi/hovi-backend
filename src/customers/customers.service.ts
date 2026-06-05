@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../auth/schemas/user.schema';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { UserRole } from '../common/constants/user-role.enum';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class CustomersService {
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @InjectModel(Order.name)
+    private readonly orderModel: Model<OrderDocument>,
   ) {}
 
   /**
@@ -61,6 +64,56 @@ export class CustomersService {
     }
 
     return customer;
+  }
+
+  /**
+   * Get full customer details including their order history and activity stats.
+   * Used for the admin customer detail page.
+   */
+  async getCustomerDetails(id: string) {
+    const customer = await this.userModel
+      .findById(id)
+      .select('-passwordHash')
+      .lean()
+      .exec();
+
+    if (!customer || customer.role !== UserRole.CUSTOMER) {
+      throw new NotFoundException(`Customer with id "${id}" not found`);
+    }
+
+    // Fetch all orders for this customer
+    const orders = await this.orderModel
+      .find({ userId: new Types.ObjectId(id) })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    // Compute summary stats
+    const totalOrders = orders.length;
+    const totalSpent = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const completedOrders = orders.filter((o) => o.status === 'delivered').length;
+    const cancelledOrders = orders.filter((o) => o.status === 'cancelled').length;
+    const pendingOrders = orders.filter(
+      (o) => !['delivered', 'cancelled'].includes(o.status),
+    ).length;
+    const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+
+    // Most recent activity
+    const lastOrderAt = orders.length > 0 ? (orders[0] as any).createdAt : null;
+
+    return {
+      customer,
+      orders,
+      stats: {
+        totalOrders,
+        totalSpent,
+        completedOrders,
+        cancelledOrders,
+        pendingOrders,
+        averageOrderValue,
+        lastOrderAt,
+      },
+    };
   }
 
   /**
