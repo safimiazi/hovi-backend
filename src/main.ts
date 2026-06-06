@@ -48,6 +48,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`🌸 Petal Beauty API running on http://localhost:${port}/api`);
+  console.log(`🌸 Kine Deo API running on http://localhost:${port}/api`);
 }
 bootstrap();

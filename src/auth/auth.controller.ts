@@ -32,7 +32,7 @@ import { CurrentUser, Public, Roles } from '../common/decorators';
 import { UserRole } from '../common/constants/user-role.enum';
 
 /** Cookie name for the refresh token */
-const REFRESH_COOKIE = 'petal_refresh_token';
+const REFRESH_COOKIE = 'kinedeo_refresh_token';
 
 @Controller('auth')
 export class AuthController {
@@ -45,7 +45,7 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {
     this.isProduction = this.configService.get<string>('NODE_ENV') === 'production';
-    // Optional: scope cookie to root domain in production (e.g. ".petalbeauty.com")
+    // Optional: scope cookie to root domain in production (e.g. ".kinedeo.com")
     this.cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
   }
 

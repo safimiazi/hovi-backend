@@ -22,7 +22,7 @@ export class NewsletterService {
     if (existing) {
       if (existing.isActive) {
         // Already subscribed — return success silently (don't leak info)
-        return { message: 'You are already part of the Petal Club!', alreadySubscribed: true };
+        return { message: 'You are already part of the Kinedeo Club!', alreadySubscribed: true };
       }
       // Re-subscribe if previously unsubscribed
       await this.subscriberModel.updateOne(
@@ -30,7 +30,7 @@ export class NewsletterService {
         { $set: { isActive: true, source: dto.source } },
       );
       this.logger.log(`Re-subscribed: ${dto.email}`);
-      return { message: 'Welcome back to the Petal Club! 🌸', alreadySubscribed: false };
+      return { message: 'Welcome back to the Kinedeo Club! 🌸', alreadySubscribed: false };
     }
 
     await this.subscriberModel.create({
@@ -39,7 +39,7 @@ export class NewsletterService {
     });
 
     this.logger.log(`New subscriber: ${dto.email}`);
-    return { message: 'Welcome to the Petal Club! 🌸', alreadySubscribed: false };
+    return { message: 'Welcome to the Kinedeo Club! 🌸', alreadySubscribed: false };
   }
 
   async unsubscribe(email: string): Promise<{ message: string }> {

@@ -5,7 +5,7 @@ export class AppService {
   getHealth() {
     return {
       status: 'ok',
-      service: 'Petal Beauty API',
+      service: 'Kine Deo API',
       timestamp: new Date().toISOString(),
     };
   }
