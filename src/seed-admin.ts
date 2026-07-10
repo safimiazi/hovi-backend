@@ -1,6 +1,6 @@
 /**
  * Seed script — creates the first super-admin account.
- * Run: npx ts-node src/seed-admin.ts
+ * Run: npm run seed:admin
  *
  * Uses the MONGODB_URI from .env file.
  */
@@ -40,12 +40,12 @@ const User = mongoose.model('User', userSchema);
 async function seed() {
   // ─── Configure your admin here ─────────────────────────────────────────────
   const ADMIN_NAME = 'Super Admin';
-  const ADMIN_EMAIL = 'admin@hovi.com';
+  const ADMIN_EMAIL = 'admin@kinedeo.com';
   const ADMIN_PASSWORD = 'Admin@1234';
   // ───────────────────────────────────────────────────────────────────────────
 
   console.log('🔌 Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI, { dbName: 'hovi' });
+  await mongoose.connect(MONGODB_URI, { dbName: 'kinedeo' });
   console.log('✅ Connected to database: hovi');
 
   // Check if admin already exists

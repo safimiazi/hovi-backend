@@ -34,7 +34,7 @@ import { RolesGuard } from './common/guards/roles.guard';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI'),
-        dbName: 'hovi',
+        dbName: 'kinedeo',
       }),
       inject: [ConfigService],
     }),
