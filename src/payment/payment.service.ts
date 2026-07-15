@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService } from '../orders/orders.service';
@@ -74,6 +74,12 @@ export class PaymentService {
   }
 
   async initiateSslCommerzPayment(dto: CreateSslCommerzPaymentDto): Promise<{ redirectUrl: string; transactionId: string }> {
+    if (dto.paymentMethod === 'cod') {
+      throw new BadRequestException(
+        'COD orders must be placed via POST /orders/cod, not the payment gateway endpoint.',
+      );
+    }
+
     this.ensureCredentials();
 
     const paymentMethod = 'sslcommerz' as const;
@@ -160,7 +166,7 @@ export class PaymentService {
     payload.append('cancel_url', `${this.frontendBaseUrl}/checkout/result?status=cancelled&tran_id=${encodeURIComponent(order.transactionId ?? order.orderNumber)}`);
     payload.append('ipn_url', `${this.backendBaseUrl}/payment/sslcommerz/ipn`);
     payload.append('cus_name', order.shippingAddress.name);
-    payload.append('cus_email', order.shippingAddress.email);
+    payload.append('cus_email', order.shippingAddress.email || `noreply+${order.shippingAddress.phone}@kinedeo.com`);
     payload.append('cus_phone', order.shippingAddress.phone);
     payload.append('cus_add1', order.shippingAddress.street);
     payload.append('cus_city', order.shippingAddress.city);

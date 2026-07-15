@@ -7,6 +7,7 @@ import { ProductsModule } from '../products/products.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { BundlesModule } from '../bundles/bundles.module';
 import { ShippingModule } from '../shipping/shipping.module';
+import { PathaoModule } from '../pathao/pathao.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ShippingModule } from '../shipping/shipping.module';
     CouponsModule,
     BundlesModule,
     ShippingModule,
+    PathaoModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

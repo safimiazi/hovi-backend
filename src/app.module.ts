@@ -18,6 +18,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { BundlesModule } from './bundles/bundles.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { PathaoModule } from './pathao/pathao.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -63,6 +64,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     NewsletterModule,
     BundlesModule,
     ShippingModule,
+    PathaoModule,
   ],
   controllers: [AppController],
   providers: [

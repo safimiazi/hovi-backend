@@ -59,8 +59,9 @@ class PaymentShippingAddressDto {
   @IsString()
   phone: string;
 
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsString()
   street: string;
@@ -103,4 +104,8 @@ export class CreateSslCommerzPaymentDto {
   @IsNumber()
   @Min(0)
   discountAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }

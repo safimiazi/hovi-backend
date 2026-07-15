@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from './schemas/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateCodOrderDto } from './dto/create-cod-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus, ORDER_STATUS_TRANSITIONS } from '../common/constants/order-status.enum';
 import { ProductsService } from '../products/products.service';
@@ -175,6 +176,46 @@ export class OrdersService {
   }
 
   /**
+   * Create a COD (Cash on Delivery) order.
+   * - Forces paymentMethod to 'cod' and status to CONFIRMED
+   * - Sets paymentCollectionStatus to 'unpaid'
+   * - Increments coupon usage synchronously after creation
+   */
+  async createCodOrder(dto: CreateCodOrderDto, userId?: string): Promise<OrderDocument> {
+    const order = await this.create(
+      {
+        items: dto.items,
+        shippingAddress: dto.shippingAddress,
+        deliveryMethod: dto.deliveryMethod,
+        paymentMethod: 'cod',
+        couponCode: dto.couponCode,
+        discountAmount: dto.discountAmount,
+      },
+      userId,
+      undefined, // no transactionId for COD
+    );
+
+    // COD orders skip the payment gateway callback and go straight to confirmed
+    order.status = OrderStatus.CONFIRMED;
+    // Initialise payment collection tracking
+    order.paymentCollectionStatus = 'unpaid';
+    const savedOrder = await order.save();
+
+    // Increment coupon usage immediately (same pattern as SSLCommerz IPN path)
+    if (savedOrder.couponCode) {
+      try {
+        await this.couponsService.incrementUsage(savedOrder.couponCode);
+      } catch {
+        // Non-fatal — don't fail the order if coupon usage increment fails
+        this.logger.warn(`Failed to increment coupon usage for COD order ${savedOrder.orderNumber}`);
+      }
+    }
+
+    this.logger.log(`COD order created: ${savedOrder.orderNumber} (Total: ৳${savedOrder.total})`);
+    return savedOrder;
+  }
+
+  /**
    * Get all orders for a specific user.
    */
   async findByUser(userId: string): Promise<OrderDocument[]> {
@@ -193,6 +234,30 @@ export class OrdersService {
   }
 
   /**
+   * Find a COD order by its human-readable order number with phone ownership check.
+   * Returns null if not found or phone does not match — controller handles 404.
+   * Phone matching uses the same normalization as findByTransactionId in the controller.
+   */
+  async findByOrderNumber(orderNumber: string, phone: string): Promise<OrderDocument | null> {
+    const order = await this.orderModel.findOne({ orderNumber }).exec();
+    if (!order) {
+      return null;
+    }
+
+    // Normalize by stripping all non-digit characters for flexible matching
+    const normalize = (p: string) => p.replace(/\D/g, '');
+    const orderPhone = normalize(order.shippingAddress.phone);
+    const requestPhone = normalize(phone);
+
+    if (!orderPhone || (!orderPhone.endsWith(requestPhone) && !requestPhone.endsWith(orderPhone))) {
+      // Return null — don't leak that orderNumber exists but phone was wrong
+      return null;
+    }
+
+    return order;
+  }
+
+  /**
    * Get a single order by ID. Validates ownership for non-admin users.
    */
   async findById(orderId: string, userId?: string): Promise<OrderDocument> {
@@ -207,15 +272,17 @@ export class OrdersService {
   }
 
   /**
-   * Admin: Get all orders with pagination and optional status filter.
+   * Admin: Get all orders with pagination and optional status/paymentMethod filter.
    */
   async findAll(
     page: number = 1,
     limit: number = 20,
     status?: OrderStatus,
+    paymentMethod?: string,
   ): Promise<{ orders: OrderDocument[]; total: number; page: number; totalPages: number }> {
     const filter: Record<string, unknown> = {};
     if (status) filter.status = status;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
 
     const skip = (page - 1) * limit;
     const [orders, total] = await Promise.all([
@@ -265,6 +332,40 @@ export class OrdersService {
   }
 
   /**
+   * Admin: Mark a COD order's payment as collected.
+   * - Validates the order exists, is COD, and is in an eligible status
+   * - Sets paymentCollectionStatus to 'collected' and records the timestamp
+   */
+  async markCodPaymentCollected(orderId: string): Promise<OrderDocument> {
+    const order = await this.orderModel.findById(orderId).exec();
+    if (!order) {
+      throw new NotFoundException(`Order with id '${orderId}' not found`);
+    }
+
+    if (order.paymentMethod !== 'cod') {
+      throw new BadRequestException(`Order ${order.orderNumber} is not a COD order`);
+    }
+
+    if (order.paymentCollectionStatus === 'collected') {
+      throw new BadRequestException(`Payment for order ${order.orderNumber} is already marked as collected`);
+    }
+
+    if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED) {
+      throw new BadRequestException(`Cannot mark payment collected for a cancelled/refunded order`);
+    }
+
+    if (order.status === OrderStatus.PENDING) {
+      throw new BadRequestException(`Cannot mark payment collected: order is not yet confirmed`);
+    }
+
+    order.paymentCollectionStatus = 'collected';
+    order.paymentCollectedAt = new Date();
+    const updatedOrder = await order.save();
+    this.logger.log(`COD payment collected for order: ${order.orderNumber}`);
+    return updatedOrder;
+  }
+
+  /**
    * Mark a pending order paid after successful SSLCommerz validation.
    */
   async markOrderPaid(transactionId: string, validation: Record<string, any>): Promise<OrderDocument | null> {
@@ -309,6 +410,29 @@ export class OrdersService {
   }
 
   /**
+   * Update pathaoStatus from Pathao webhook.
+   * Finds order by pathaoConsignmentId or orderNumber and updates pathaoStatus.
+   * Never throws — webhook should always return 200.
+   */
+  async updatePathaoStatus(consignmentId?: string, orderNumber?: string, pathaoStatus?: string): Promise<void> {
+    if (!pathaoStatus) return;
+    try {
+      const filter: Record<string, unknown> = {};
+      if (consignmentId) {
+        filter.pathaoConsignmentId = consignmentId;
+      } else if (orderNumber) {
+        filter.orderNumber = orderNumber;
+      } else {
+        return;
+      }
+      await this.orderModel.findOneAndUpdate(filter, { $set: { pathaoStatus } }).exec();
+      this.logger.log(`Pathao webhook: updated pathaoStatus="${pathaoStatus}" for ${consignmentId ?? orderNumber}`);
+    } catch (err: any) {
+      this.logger.warn(`Pathao webhook update failed: ${err?.message}`);
+    }
+  }
+
+  /**
    * Admin: Get order statistics.
    */
   async getStats(): Promise<{
@@ -320,8 +444,9 @@ export class OrdersService {
     delivered: number;
     cancelled: number;
     revenue: number;
+    codUnpaidCount: number;
   }> {
-    const [total, pending, confirmed, processing, shipped, delivered, cancelled] = await Promise.all([
+    const [total, pending, confirmed, processing, shipped, delivered, cancelled, codUnpaidCount] = await Promise.all([
       this.orderModel.countDocuments().exec(),
       this.orderModel.countDocuments({ status: OrderStatus.PENDING }).exec(),
       this.orderModel.countDocuments({ status: OrderStatus.CONFIRMED }).exec(),
@@ -329,6 +454,11 @@ export class OrdersService {
       this.orderModel.countDocuments({ status: OrderStatus.SHIPPED }).exec(),
       this.orderModel.countDocuments({ status: OrderStatus.DELIVERED }).exec(),
       this.orderModel.countDocuments({ status: OrderStatus.CANCELLED }).exec(),
+      this.orderModel.countDocuments({
+        paymentMethod: 'cod',
+        paymentCollectionStatus: 'unpaid',
+        status: { $nin: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] },
+      }).exec(),
     ]);
 
     const revenueResult = await this.orderModel.aggregate([
@@ -338,7 +468,7 @@ export class OrdersService {
 
     const revenue = revenueResult[0]?.total || 0;
 
-    return { total, pending, confirmed, processing, shipped, delivered, cancelled, revenue };
+    return { total, pending, confirmed, processing, shipped, delivered, cancelled, revenue, codUnpaidCount };
   }
 
   /**

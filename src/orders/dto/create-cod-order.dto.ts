@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsArray, IsEnum, IsMongoId, IsEmail, IsBoolean, Min, ValidateNested, ArrayMinSize } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, IsEnum, IsEmail, IsBoolean, Min, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
@@ -71,7 +71,7 @@ class ShippingAddressDto {
   note?: string;
 }
 
-export class CreateOrderDto {
+export class CreateCodOrderDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -84,9 +84,6 @@ export class CreateOrderDto {
 
   @IsEnum(['standard', 'express'])
   deliveryMethod: 'standard' | 'express';
-
-  @IsEnum(['cod', 'bkash', 'nagad', 'sslcommerz'])
-  paymentMethod: 'cod' | 'bkash' | 'nagad' | 'sslcommerz';
 
   @IsOptional()
   @IsString()

@@ -45,8 +45,8 @@ export class ShippingAddress {
   @Prop({ required: true })
   phone: string;
 
-  @Prop({ required: true })
-  email: string;
+  @Prop()
+  email?: string;
 
   @Prop({ required: true })
   street: string;
@@ -118,12 +118,29 @@ export class Order {
 
   @Prop({ unique: true })
   orderNumber: string;
+
+  @Prop({ enum: ['unpaid', 'collected'] })
+  paymentCollectionStatus?: 'unpaid' | 'collected';
+
+  @Prop()
+  paymentCollectedAt?: Date;
+
+  @Prop()
+  pathaoConsignmentId?: string;
+
+  @Prop()
+  pathaoStatus?: string;
 }
 
-export type OrderDocument = Order & Document;
+export type OrderDocument = Order &
+  Document & {
+    paymentCollectionStatus?: 'unpaid' | 'collected';
+    paymentCollectedAt?: Date;
+  };
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
 OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
-OrderSchema.index({ orderNumber: 1 }, { unique: true });
+// orderNumber unique index is handled by @Prop({ unique: true }) above — no duplicate needed
+OrderSchema.index({ paymentMethod: 1, paymentCollectionStatus: 1, status: 1 });
