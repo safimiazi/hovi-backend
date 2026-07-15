@@ -31,6 +31,7 @@ export class CouponsService {
       items?: Array<{ productId: string; sku?: string; qty: number; price: number }>;
       userId?: string;
       userEmail?: string;
+      userPhone?: string;
     },
   ) {
     const coupon = await this.couponModel
@@ -117,9 +118,9 @@ export class CouponsService {
     }
 
     if (coupon.perUserLimit) {
-      if (!options?.userId && !options?.userEmail) {
+      if (!options?.userId && !options?.userEmail && !options?.userPhone) {
         throw new BadRequestException(
-          'Please login or provide a valid email to use this coupon.',
+          'Please login or provide contact details to use this coupon.',
         );
       }
 
@@ -130,6 +131,8 @@ export class CouponsService {
 
       if (options.userId) {
         userQuery.userId = new Types.ObjectId(options.userId);
+      } else if (options.userPhone) {
+        userQuery['shippingAddress.phone'] = options.userPhone.replace(/\D/g, '');
       } else if (options.userEmail) {
         userQuery['shippingAddress.email'] = options.userEmail.toLowerCase();
       }
@@ -179,6 +182,8 @@ export class CouponsService {
         isActive: true,
         validFrom: { $lte: now },
         validUntil: { $gte: now },
+        // Exclude one-time personal coupons (usageLimit: 1) from public suggestions
+        $or: [{ usageLimit: { $exists: false } }, { usageLimit: { $gt: 1 } }],
       })
       .select('code description discountType discountValue minimumOrderAmount maximumDiscount')
       .sort({ discountValue: -1, validUntil: 1 })
@@ -231,6 +236,39 @@ export class CouponsService {
     const coupon = new this.couponModel({
       ...dto,
       code: dto.code.toUpperCase(),
+    });
+
+    return coupon.save();
+  }
+
+  /**
+   * Admin: generate a one-time personal coupon instantly.
+   * Useful for negotiated deals — e.g. customer asks for ৳100 off.
+   * Auto-generates a unique code, sets usageLimit=1, expires in `expiryHours`.
+   */
+  async createQuickCoupon(dto: {
+    discountType: DiscountType;
+    discountValue: number;
+    expiryHours?: number;
+    note?: string;
+  }) {
+    const expiryHours = dto.expiryHours ?? 48;
+
+    // Generate a 4-digit numeric code: 1000–9999
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+
+    const now = new Date();
+    const validUntil = new Date(now.getTime() + expiryHours * 60 * 60 * 1000);
+
+    const coupon = new this.couponModel({
+      code,
+      description: dto.note || `One-time personal deal • ${dto.discountType === DiscountType.FIXED ? `৳${dto.discountValue} off` : `${dto.discountValue}% off`}`,
+      discountType: dto.discountType,
+      discountValue: dto.discountValue,
+      usageLimit: 1,
+      validFrom: now,
+      validUntil,
+      isActive: true,
     });
 
     return coupon.save();

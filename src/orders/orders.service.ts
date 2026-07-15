@@ -16,6 +16,8 @@ import { ProductsService } from '../products/products.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { BundlesService } from '../bundles/bundles.service';
 import { ShippingService } from '../shipping/shipping.service';
+import { User, UserDocument } from '../auth/schemas/user.schema';
+import { UserRole } from '../common/constants/user-role.enum';
 
 @Injectable()
 export class OrdersService {
@@ -24,6 +26,8 @@ export class OrdersService {
   constructor(
     @InjectModel(Order.name)
     private readonly orderModel: Model<OrderDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
     private readonly productsService: ProductsService,
     private readonly couponsService: CouponsService,
     private readonly bundlesService: BundlesService,
@@ -177,11 +181,33 @@ export class OrdersService {
 
   /**
    * Create a COD (Cash on Delivery) order.
+   * - Auto-creates or finds user by phone (no duplicate)
    * - Forces paymentMethod to 'cod' and status to CONFIRMED
    * - Sets paymentCollectionStatus to 'unpaid'
    * - Increments coupon usage synchronously after creation
    */
   async createCodOrder(dto: CreateCodOrderDto, userId?: string): Promise<OrderDocument> {
+    // Auto-create or find user by phone if not already logged in
+    let resolvedUserId = userId;
+    if (!resolvedUserId && dto.shippingAddress.phone) {
+      try {
+        let user = await this.userModel.findOne({ phone: dto.shippingAddress.phone });
+        if (!user) {
+          user = await this.userModel.create({
+            name: dto.shippingAddress.name || `User ${dto.shippingAddress.phone.slice(-4)}`,
+            phone: dto.shippingAddress.phone,
+            role: UserRole.CUSTOMER,
+            isPhoneVerified: false,
+          });
+          this.logger.log(`Auto-created user for COD order: ${dto.shippingAddress.phone}`);
+        }
+        resolvedUserId = user._id.toString();
+      } catch (err: any) {
+        this.logger.warn(`Failed to auto-create user for COD order: ${err?.message}`);
+        // Non-fatal — order proceeds as guest
+      }
+    }
+
     const order = await this.create(
       {
         items: dto.items,
@@ -191,7 +217,7 @@ export class OrdersService {
         couponCode: dto.couponCode,
         discountAmount: dto.discountAmount,
       },
-      userId,
+      resolvedUserId,
       undefined, // no transactionId for COD
     );
 

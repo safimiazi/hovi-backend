@@ -56,6 +56,48 @@ export class AuthService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // PHONE-ONLY LOGIN (Temporary — no OTP verification)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Login or register by phone number only — no OTP required.
+   * Used temporarily until SMS OTP is configured.
+   * Finds existing user or auto-creates a new customer account.
+   */
+  async phoneLogin(phone: string): Promise<InternalTokenResponse> {
+    let user = await this.userModel.findOne({ phone });
+
+    if (!user) {
+      user = await this.userModel.create({
+        name: `User ${phone.slice(-4)}`,
+        phone,
+        isPhoneVerified: false,
+        role: UserRole.CUSTOMER,
+      });
+      this.logger.log(`New customer auto-registered via phone (no OTP): ${phone}`);
+    } else {
+      if (!user.isActive) {
+        throw new ForbiddenException('Account has been deactivated');
+      }
+      user.lastLoginAt = new Date();
+      await user.save();
+    }
+
+    const tokens = await this.generateTokens(user);
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // PHONE OTP FLOW (Customer Default)
   // ─────────────────────────────────────────────────────────────────────────────
 

@@ -176,16 +176,29 @@ export class OrdersController {
   /**
    * Admin: Push an order to Pathao Courier as a consignment.
    * Creates a Pathao shipment and saves the consignment_id on the order.
-   * Re-pushing overwrites the existing consignment_id.
+   * Re-pushing first cancels the existing consignment, then creates a new one.
    */
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('admin/:id/pathao-push')
-  async pathoPush(@Param('id') id: string) {
+  async pathoPush(
+    @Param('id') id: string,
+    @Body() body?: { itemWeight?: number; itemDescription?: string; specialInstruction?: string },
+  ) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid order ID format');
     }
     const order = await this.ordersService.findById(id);
-    const consignmentId = await this.pathaoService.pushConsignment(order);
+
+    // Cancel existing consignment before re-pushing to avoid duplicate active deliveries
+    if (order.pathaoConsignmentId) {
+      await this.pathaoService.cancelConsignment(order.pathaoConsignmentId);
+    }
+
+    const consignmentId = await this.pathaoService.pushConsignment(order, {
+      itemWeight: body?.itemWeight,
+      itemDescription: body?.itemDescription,
+      specialInstruction: body?.specialInstruction,
+    });
     order.pathaoConsignmentId = consignmentId;
     return order.save();
   }

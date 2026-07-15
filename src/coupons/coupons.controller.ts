@@ -8,10 +8,30 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto, UpdateCouponDto, ValidateCouponDto } from './dto';
 import { Public, Roles, CurrentUser } from '../common/decorators';
 import { UserRole } from '../common/constants/user-role.enum';
+import { DiscountType } from './schemas/coupon.schema';
+
+class QuickCouponDto {
+  @IsEnum(DiscountType)
+  discountType: DiscountType;
+
+  @IsNumber()
+  @Min(1)
+  discountValue: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  expiryHours?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
 
 @Controller('coupons')
 export class CouponsController {
@@ -29,6 +49,7 @@ export class CouponsController {
       items: dto.items,
       userId: user?.userId,
       userEmail: dto.userEmail,
+      userPhone: dto.userPhone,
     });
   }
 
@@ -56,6 +77,16 @@ export class CouponsController {
   @Post()
   create(@Body() dto: CreateCouponDto) {
     return this.couponsService.create(dto);
+  }
+
+  /**
+   * Admin: generate a one-time personal coupon instantly.
+   * POST /coupons/quick — { discountType, discountValue, expiryHours?, note? }
+   */
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Post('quick')
+  createQuick(@Body() dto: QuickCouponDto) {
+    return this.couponsService.createQuickCoupon(dto);
   }
 
   /**

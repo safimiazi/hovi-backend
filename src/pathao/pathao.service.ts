@@ -196,10 +196,29 @@ export class PathaoService {
   /**
    * Creates a consignment on Pathao and returns the consignment_id.
    * Throws BadGatewayException on Pathao API errors.
+   * Optional overrides: itemWeight, itemDescription, specialInstruction
    */
-  async pushConsignment(order: OrderDocument): Promise<string> {
+  async pushConsignment(
+    order: OrderDocument,
+    overrides?: {
+      itemWeight?: number;
+      itemDescription?: string;
+      specialInstruction?: string;
+    },
+  ): Promise<string> {
     const token = await this.getToken();
     const payload = this.buildPayload(order);
+
+    // Apply admin overrides
+    if (overrides?.itemWeight !== undefined && overrides.itemWeight > 0) {
+      payload.item_weight = overrides.itemWeight;
+    }
+    if (overrides?.itemDescription?.trim()) {
+      payload.item_description = overrides.itemDescription.trim();
+    }
+    if (overrides?.specialInstruction?.trim()) {
+      payload.special_instruction = overrides.specialInstruction.trim();
+    }
 
     this.logger.log(
       `Pushing order ${order.orderNumber} to Pathao (store_id=${this.storeId})`,

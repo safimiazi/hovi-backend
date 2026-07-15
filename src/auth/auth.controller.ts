@@ -19,6 +19,7 @@ import { AuthService } from './auth.service';
 import {
   RegisterDto,
   LoginDto,
+  PhoneLoginDto,
   SendOtpDto,
   VerifyOtpDto,
   RefreshTokenDto,
@@ -98,6 +99,26 @@ export class AuthController {
    */
   private extractRefreshToken(req: Request, dto?: RefreshTokenDto): string | null {
     return (req.cookies?.[REFRESH_COOKIE] as string | undefined) ?? dto?.refreshToken ?? null;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PHONE-ONLY LOGIN (Temporary — no OTP)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Phone-only login — no OTP required (temporary until SMS is configured).
+   * Finds or auto-creates a customer by phone number.
+   */
+  @Public()
+  @Post('phone-login')
+  @HttpCode(HttpStatus.OK)
+  async phoneLogin(
+    @Body() dto: PhoneLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<TokenResponseDto> {
+    const result = await this.authService.phoneLogin(dto.phone);
+    this.setRefreshCookie(res, result.refreshToken);
+    return this.toPublicResponse(result);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

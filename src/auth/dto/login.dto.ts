@@ -14,6 +14,17 @@ export class LoginDto {
 }
 
 /**
+ * Phone-only login (no OTP) — temporary until OTP SMS is set up.
+ * Finds or creates a customer by phone number.
+ */
+export class PhoneLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^01[3-9]\d{8}$/, { message: 'Phone must be a valid 11-digit Bangladeshi mobile number' })
+  phone: string;
+}
+
+/**
  * Send OTP to phone number (customer default login)
  */
 export class SendOtpDto {

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, Min, IsOptional, IsArray, IsMongoId, ValidateNested, IsEmail } from 'class-validator';
+import { IsString, IsNumber, Min, IsOptional, IsArray, IsMongoId, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class CouponItemDto {
@@ -38,6 +38,10 @@ export class ValidateCouponDto {
   userId?: string;
 
   @IsOptional()
-  @IsEmail()
+  @IsString()
   userEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  userPhone?: string;
 }
