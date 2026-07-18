@@ -2,11 +2,7 @@ version: "3.9"
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    image: kinedeo-api:latest
+    image: ghcr.io/${GHCR_OWNER}/kinedeo-api:latest
     container_name: kinedeo-api-prod
     restart: always
     ports:
