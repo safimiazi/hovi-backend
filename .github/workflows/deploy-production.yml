@@ -1,0 +1,103 @@
+name: Deploy — Production (Manual)
+
+# ─── Triggers ────────────────────────────────────────────────────────────────
+# ONLY runs when you manually click "Run workflow" in GitHub Actions UI.
+# Push to prod branch does NOT trigger this workflow automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'deploy' to confirm production deployment"
+        required: true
+        default: ""
+      image_tag:
+        description: "Docker image tag to deploy (default: latest)"
+        required: false
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/kinedeo-api
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Guard: abort if confirmation text is wrong
+  # ────────────────────────────────────────────────────────────────────────────
+  guard:
+    name: Confirm Deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy" ]; then
+            echo "❌ Confirmation failed. You must type 'deploy' to proceed."
+            exit 1
+          fi
+          echo "✅ Deployment confirmed by ${{ github.actor }}"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Deploy to VPS via SSH
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    needs: guard
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: prod  # always deploy from prod branch
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+
+            # Pull latest code from prod branch
+            git pull origin prod
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u ${{ github.actor }} --password-stdin
+
+            # Pull the specified image tag
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}"
+            docker pull $IMAGE
+
+            # Update image reference and restart
+            GHCR_OWNER=${{ github.repository_owner }} \
+              docker compose -f docker-compose.prod.yml up -d --no-build
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "✅ Deployed $IMAGE to production"
+
+      - name: Deployment summary
+        run: |
+          echo "### ✅ Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`prod\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Deployed by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Time** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY

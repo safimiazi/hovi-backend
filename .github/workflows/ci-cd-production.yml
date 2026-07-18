@@ -1,9 +1,13 @@
-name: CI/CD — Production
+name: CI — Production
 
-# Triggers only on push to main branch
+# ─── Triggers ────────────────────────────────────────────────────────────────
+# Runs automatically on every push/PR to the prod branch.
+# This only does CI (lint, type-check, build) — NO deployment.
 on:
   push:
-    branches: [main]
+    branches: [prod]
+  pull_request:
+    branches: [prod]
 
 env:
   REGISTRY: ghcr.io
@@ -11,7 +15,7 @@ env:
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
-  # Job 1: Lint, type-check, build
+  # Job 1: Lint, Type-check & Build
   # ────────────────────────────────────────────────────────────────────────────
   ci:
     name: Lint, Type-check & Build
@@ -40,25 +44,21 @@ jobs:
         run: npm run build
 
   # ────────────────────────────────────────────────────────────────────────────
-  # Job 2: Build & push Docker image to GitHub Container Registry
+  # Job 2: Build & push Docker image (only on push, not PR)
   # ────────────────────────────────────────────────────────────────────────────
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: ci  # only runs if CI passes
+    needs: ci
+    if: github.event_name == 'push'  # skip on PRs
     permissions:
       contents: read
       packages: write
-
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-      image_digest: ${{ steps.build-push.outputs.digest }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Login to GitHub Container Registry
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -66,7 +66,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Generate image tags: latest + short SHA
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -76,12 +75,10 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      # Build and push multi-platform image
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build & push image
-        id: build-push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -92,56 +89,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # Job 3: Deploy to VPS via SSH
-  # ────────────────────────────────────────────────────────────────────────────
-  deploy:
-    name: Deploy to Production VPS
-    runs-on: ubuntu-latest
-    needs: docker  # only runs after image is pushed
-    environment: production  # requires manual approval if configured
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # SSH into VPS and deploy
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          script: |
-            set -e
-
-            # Navigate to project directory
-            cd ${{ secrets.VPS_PROJECT_PATH }}
-
-            # Pull latest code
-            git pull origin main
-
-            # Login to GHCR
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-              -u ${{ github.actor }} --password-stdin
-
-            # Pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-            # Restart with zero-downtime
-            docker compose -f docker-compose.prod.yml up -d --no-build
-
-            # Remove old/dangling images
-            docker image prune -f
-
-            echo "✅ Deployed ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-
-      # Notify on success
-      - name: Deployment success summary
-        run: |
-          echo "### ✅ Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
