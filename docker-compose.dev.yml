@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: kinedeo-api-dev
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+    volumes:
+      # Mount source so hot-reload picks up changes instantly
+      - .:/app
+      # Prevent host node_modules from overwriting container's
+      - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - kinedeo-dev
+
+  redis:
+    image: redis:7-alpine
+    container_name: kinedeo-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - kinedeo-dev
+
+networks:
+  kinedeo-dev:
+    driver: bridge

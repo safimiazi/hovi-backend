@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: kinedeo-api:latest
+    container_name: kinedeo-api-prod
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - kinedeo-prod
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: kinedeo-redis-prod
+    restart: always
+    # No external port exposure in production — internal only
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kinedeo-prod
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  kinedeo-prod:
+    driver: bridge
