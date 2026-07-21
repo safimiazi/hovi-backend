@@ -2,7 +2,10 @@ version: "3.9"
 
 services:
   api:
-    image: ghcr.io/${GHCR_OWNER}/kinedeo-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kinedeo-api:local
     container_name: kinedeo-api-prod
     restart: always
     ports:
@@ -11,9 +14,6 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - kinedeo-prod
     # Resource limits
