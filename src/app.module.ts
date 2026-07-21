@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -21,6 +21,7 @@ import { ShippingModule } from './shipping/shipping.module';
 import { PathaoModule } from './pathao/pathao.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { DevThrottlerGuard } from './common/guards/dev-throttler.guard';
 
 @Module({
   imports: [
@@ -35,19 +36,23 @@ import { RolesGuard } from './common/guards/roles.guard';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('MONGODB_URI'),
-        dbName: 'kinedeo',
+        dbName: configService.get<string>('MONGODB_DB_NAME'),
       }),
       inject: [ConfigService],
     }),
 
-    // Rate limiting
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          ttl: 60000, // 1 minute window
-          limit: 100, // 100 requests per minute default
-        },
-      ],
+    // Rate limiting — disabled in development, enforced in production
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: () => ({
+        throttlers: [
+          {
+            ttl: 60000,
+            limit: 100,
+          },
+        ],
+      }),
+      inject: [ConfigService],
     }),
 
     // Feature modules
@@ -80,10 +85,10 @@ import { RolesGuard } from './common/guards/roles.guard';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
-    // Global rate limiting guard
+    // Global rate limiting guard — skipped in development
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: DevThrottlerGuard,
     },
   ],
 })

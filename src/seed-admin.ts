@@ -1,90 +1,107 @@
 /**
- * Seed script — creates the first super-admin account.
- * Run: npm run seed:admin
+ * Seed script — create a super-admin user directly in the database.
  *
- * Uses the MONGODB_URI from .env file.
+ * Usage:
+ *   npm run seed:admin
+ *
+ * This script reads MONGODB_URI from .env and upserts the super-admin account.
+ * Safe to run multiple times — updates password if the user already exists.
  */
 
+import 'reflect-metadata';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 import * as mongoose from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
-dotenv.config();
+// Load .env from project root
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// ─── Config ──────────────────────────────────────────────────────────────────
 
-if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI not found in .env');
+const MONGO_URI = process.env.MONGODB_URI;
+if (!MONGO_URI) {
+  console.error('❌  MONGODB_URI not found in .env');
   process.exit(1);
 }
 
-// User schema (minimal version for seeding)
-const userSchema = new mongoose.Schema(
+const SUPER_ADMIN = {
+  name: 'Mohibul Miazi',
+  email: 'mohibullamiazi@gmail.com',
+  password: 'Adminshafi12!@',
+  role: 'super-admin',
+};
+
+// ─── Schema (minimal — mirrors user.schema.ts) ────────────────────────────────
+
+const UserSchema = new mongoose.Schema(
   {
     name: String,
-    email: String,
+    email: { type: String, lowercase: true, trim: true },
     passwordHash: String,
-    phone: String,
     role: { type: String, default: 'customer' },
     isActive: { type: Boolean, default: true },
-    isPhoneVerified: { type: Boolean, default: false },
     isEmailVerified: { type: Boolean, default: false },
-    addresses: { type: Array, default: [] },
+    isPhoneVerified: { type: Boolean, default: false },
     failedLoginAttempts: { type: Number, default: 0 },
+    favoriteProducts: { type: [mongoose.Schema.Types.ObjectId], default: [] },
+    addresses: { type: Array, default: [] },
   },
-  { timestamps: true },
+  { timestamps: true, collection: 'users' },
 );
 
-const User = mongoose.model('User', userSchema);
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function seed() {
-  // ─── Configure your admin here ─────────────────────────────────────────────
-  const ADMIN_NAME = 'Super Admin';
-  const ADMIN_EMAIL = 'admin@kinedeo.com';
-  const ADMIN_PASSWORD = 'Admin@1234';
-  // ───────────────────────────────────────────────────────────────────────────
+  console.log('�  Connecting to MongoDB…');
+  await mongoose.connect(MONGO_URI as string);
+  console.log('✅  Connected');
 
-  console.log('🔌 Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI, { dbName: 'kinedeo' });
-  console.log('✅ Connected to database: hovi');
+  const User = mongoose.model('User', UserSchema);
 
-  // Check if admin already exists
-  const existing = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
+  const passwordHash = await bcrypt.hash(SUPER_ADMIN.password, 12);
+
+  const existing = await User.findOne({ email: SUPER_ADMIN.email });
+
   if (existing) {
-    console.log(`⚠️  Admin already exists: ${ADMIN_EMAIL} (role: ${existing.role})`);
-    await mongoose.disconnect();
-    process.exit(0);
+    await User.updateOne(
+      { email: SUPER_ADMIN.email },
+      {
+        $set: {
+          name: SUPER_ADMIN.name,
+          role: SUPER_ADMIN.role,
+          passwordHash,
+          isActive: true,
+          isEmailVerified: true,
+        },
+      },
+    );
+    console.log(`🔄  Super-admin updated: ${SUPER_ADMIN.email}`);
+  } else {
+    await User.create({
+      name: SUPER_ADMIN.name,
+      email: SUPER_ADMIN.email,
+      passwordHash,
+      role: SUPER_ADMIN.role,
+      isActive: true,
+      isEmailVerified: true,
+    });
+    console.log(`🎉  Super-admin created: ${SUPER_ADMIN.email}`);
   }
 
-  // Create super-admin
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
-
-  const admin = await User.create({
-    name: ADMIN_NAME,
-    email: ADMIN_EMAIL.toLowerCase(),
-    passwordHash,
-    role: 'super-admin',
-    isActive: true,
-    isEmailVerified: true,
-  });
-
   console.log('');
-  console.log('🎉 Super Admin created successfully!');
   console.log('─────────────────────────────────────');
-  console.log(`   Name:     ${admin.name}`);
-  console.log(`   Email:    ${admin.email}`);
-  console.log(`   Password: ${ADMIN_PASSWORD}`);
-  console.log(`   Role:     super-admin`);
+  console.log('  Email   :', SUPER_ADMIN.email);
+  console.log('  Password: K!n3d€o@Admin#2025');
+  console.log('  Role    :', SUPER_ADMIN.role);
   console.log('─────────────────────────────────────');
   console.log('');
-  console.log('👉 Login at: /admin/login');
-  console.log('⚠️  Change the password after first login!');
 
   await mongoose.disconnect();
-  process.exit(0);
+  console.log('🔌  Disconnected. Done.');
 }
 
 seed().catch((err) => {
-  console.error('❌ Seed failed:', err.message);
+  console.error('❌  Seed failed:', err);
   process.exit(1);
 });

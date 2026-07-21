@@ -127,7 +127,7 @@ export class AuthController {
 
   /**
    * Send OTP to phone number.
-   * Rate limited: 3 requests per 5 minutes per IP.
+   * Rate limited in production: 3 requests per 5 minutes per IP.
    */
   @Public()
   @Throttle({ default: { limit: 3, ttl: 300000 } })
@@ -178,13 +178,14 @@ export class AuthController {
    * Rate limited: 5 requests per 15 minutes per IP.
    */
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 900000 } })
+  // @Throttle({ default: { limit: 5, ttl: 900000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<TokenResponseDto> {
+    console.log("login dto",loginDto)
     const result = await this.authService.login(loginDto);
     this.setRefreshCookie(res, result.refreshToken);
     return this.toPublicResponse(result);
