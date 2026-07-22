@@ -15,7 +15,9 @@ import * as mongoose from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 // Load .env from project root
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// If NODE_ENV=production, use .env.production instead
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+dotenv.config({ path: path.join(__dirname, '..', envFile) });
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
