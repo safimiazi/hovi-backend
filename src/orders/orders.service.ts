@@ -133,7 +133,12 @@ export class OrdersService {
 
     // Step 4: Calculate totals
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const shippingCost = await this.shippingService.calculateShipping(subtotal, dto.deliveryMethod as 'standard' | 'express');
+    const division = dto.shippingAddress.city; // city field holds the division name
+    const shippingCost = await this.shippingService.calculateShipping(
+      subtotal,
+      dto.deliveryMethod as 'standard' | 'express',
+      division,
+    );
     let discountAmount = 0;
 
     if (dto.couponCode) {
