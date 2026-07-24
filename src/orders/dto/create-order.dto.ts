@@ -56,12 +56,24 @@ class ShippingAddressDto {
   @IsString()
   street: string;
 
+  /** Division name (e.g., "Dhaka", "Chattogram") */
   @IsString()
   city: string;
+
+  /** District name (e.g., "Gazipur", "Dhaka") */
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  /** Upazila/Thana name (e.g., "Gazipur Sadar", "Dhamrai") */
+  @IsOptional()
+  @IsString()
+  upazila?: string;
 
   @IsString()
   postcode: string;
 
+  /** @deprecated Use district + upazila instead. Kept for backward compatibility. */
   @IsOptional()
   @IsString()
   area?: string;

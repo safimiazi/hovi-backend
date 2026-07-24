@@ -51,12 +51,22 @@ export class ShippingAddress {
   @Prop({ required: true })
   street: string;
 
+  /** Division name (e.g., "Dhaka", "Chattogram") */
   @Prop({ required: true })
   city: string;
+
+  /** District name (e.g., "Gazipur", "Dhaka") */
+  @Prop()
+  district?: string;
+
+  /** Upazila/Thana name (e.g., "Gazipur Sadar", "Dhamrai") */
+  @Prop()
+  upazila?: string;
 
   @Prop({ required: true })
   postcode: string;
 
+  /** @deprecated Use district + upazila instead. Kept for backward compatibility. */
   @Prop()
   area?: string;
 
