@@ -39,10 +39,23 @@ export class ShippingService {
   }
 
   /**
-   * Calculate the shipping cost for an order based on current DB settings.
-   * Used by OrdersService to replace the hardcoded logic.
+   * Calculate the shipping cost for an order based on division.
+   * - Dhaka division → 60 BDT
+   * - Any other division → 120 BDT
+   * The method parameter is kept for future express support.
    */
-  async calculateShipping(subtotal: number, method: 'standard' | 'express'): Promise<number> {
+  async calculateShipping(
+    subtotal: number,
+    method: 'standard' | 'express',
+    division?: string,
+  ): Promise<number> {
+    // Division-based pricing takes priority
+    if (division) {
+      const isDhaka = division.toLowerCase() === 'dhaka';
+      return isDhaka ? 60 : 120;
+    }
+
+    // Fallback to DB settings when no division provided (backward compat)
     const s = await this.getSettings();
     if (method === 'express') {
       return s.expressEnabled ? s.expressCost : s.standardCost;

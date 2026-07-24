@@ -66,12 +66,24 @@ class PaymentShippingAddressDto {
   @IsString()
   street: string;
 
+  /** Division name */
   @IsString()
   city: string;
+
+  /** District name */
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  /** Upazila/Thana name */
+  @IsOptional()
+  @IsString()
+  upazila?: string;
 
   @IsString()
   postcode: string;
 
+  /** @deprecated Use district + upazila. Kept for backward compatibility. */
   @IsOptional()
   @IsString()
   area?: string;

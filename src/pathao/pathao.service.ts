@@ -153,10 +153,11 @@ export class PathaoService {
    * This gives Pathao enough context to auto-detect city/zone.
    */
   buildPayload(order: OrderDocument): PathaoConsignmentPayload {
-    // Build address: street → area → city (distinct parts, joined cleanly)
+    // Build address: street → upazila → district → city (all parts, most specific first)
     const addressParts = [
       order.shippingAddress.street,
-      order.shippingAddress.area,
+      order.shippingAddress.upazila,
+      order.shippingAddress.district ?? order.shippingAddress.area, // district preferred, area as fallback
       order.shippingAddress.city,
     ].filter((p): p is string => !!p && p.trim().length > 0);
 
